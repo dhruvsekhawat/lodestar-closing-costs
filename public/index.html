@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LodeStar Closing Cost Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <span class="logo-text">LodeStar<span class="logo-accent">API</span></span>
+      </div>
+      <div class="header-right">
+        <div id="session-status" class="session-status disconnected">
+          <span class="status-dot"></span>
+          <span class="status-text">Not Connected</span>
+        </div>
+        <button id="connect-btn" class="btn btn-primary">Connect</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Sidebar Navigation -->
+      <nav class="sidebar">
+        <div class="nav-section">
+          <span class="nav-section-title">Calculations</span>
+          <button class="nav-item active" data-view="closing-costs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Closing Costs
+          </button>
+          <button class="nav-item" data-view="property-tax">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            Property Tax
+          </button>
+        </div>
+        <div class="nav-section">
+          <span class="nav-section-title">Reference Data</span>
+          <button class="nav-item" data-view="endorsements">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            Endorsements
+          </button>
+          <button class="nav-item" data-view="locations">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            Locations
+          </button>
+        </div>
+      </nav>
+
+      <!-- Content Area -->
+      <div class="content-area">
+        <!-- Closing Costs View -->
+        <section id="closing-costs-view" class="view active">
+          <div class="view-header">
+            <h1>Closing Cost Calculator</h1>
+            <p>Calculate transfer taxes, recording fees, title fees, and title premiums</p>
+          </div>
+
+          <form id="closing-costs-form" class="calculator-form">
+            <div class="form-grid">
+              <!-- Location Section -->
+              <div class="form-section">
+                <h3 class="section-title">Property Location</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="cc-state">State *</label>
+                    <select id="cc-state" required>
+                      <option value="">Select State</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="cc-county">County *</label>
+                    <select id="cc-county" required disabled>
+                      <option value="">Select County</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="cc-township">Township *</label>
+                    <select id="cc-township" required disabled>
+                      <option value="">Select Township</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="cc-address">Property Address</label>
+                  <input type="text" id="cc-address" placeholder="123 Main St, Apt 1">
+                </div>
+              </div>
+
+              <!-- Transaction Section -->
+              <div class="form-section">
+                <h3 class="section-title">Transaction Details</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="cc-purpose">Transaction Type *</label>
+                    <select id="cc-purpose" required>
+                      <option value="11">Purchase</option>
+                      <option value="00">Refinance</option>
+                      <option value="04">Refinance (Reissue)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="cc-search-type">Search Type *</label>
+                    <select id="cc-search-type" required>
+                      <option value="CFPB">CFPB (Full)</option>
+                      <option value="Title">Title Only</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="cc-purchase-price">Purchase Price ($)</label>
+                    <input type="number" id="cc-purchase-price" placeholder="300000" value="300000">
+                  </div>
+                  <div class="form-group">
+                    <label for="cc-loan-amount">Loan Amount ($)</label>
+                    <input type="number" id="cc-loan-amount" placeholder="240000" value="240000">
+                  </div>
+                  <div class="form-group">
+                    <label for="cc-close-date">Close Date</label>
+                    <input type="date" id="cc-close-date">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Loan Info Section -->
+              <div class="form-section collapsible">
+                <h3 class="section-title" data-toggle="loan-info">
+                  <span>Loan Information (Optional)</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </h3>
+                <div id="loan-info" class="collapsible-content">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="cc-prop-type">Property Type</label>
+                      <select id="cc-prop-type">
+                        <option value="">Not Specified</option>
+                        <option value="1">Single Family</option>
+                        <option value="2">Multi Family</option>
+                        <option value="3">Condo</option>
+                        <option value="4">Coop</option>
+                        <option value="5">PUD</option>
+                        <option value="6">Manufactured</option>
+                        <option value="7">Land</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="cc-loan-type">Loan Type</label>
+                      <select id="cc-loan-type">
+                        <option value="">Not Specified</option>
+                        <option value="1">Conventional</option>
+                        <option value="2">FHA</option>
+                        <option value="3">VA</option>
+                        <option value="4">USDA</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="cc-amort-type">Amortization</label>
+                      <select id="cc-amort-type">
+                        <option value="">Not Specified</option>
+                        <option value="1">Fixed Rate</option>
+                        <option value="2">Adjustable Rate</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group checkbox-group">
+                      <label>
+                        <input type="checkbox" id="cc-first-time-buyer">
+                        First Time Home Buyer
+                      </label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label>
+                        <input type="checkbox" id="cc-federal-credit-union">
+                        Federal Credit Union Lender
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" id="clear-form-btn">Clear</button>
+              <button type="submit" class="btn btn-primary btn-large" id="calculate-btn">
+                <span>Calculate Closing Costs</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="12 5 19 12 12 19"/>
+                </svg>
+              </button>
+            </div>
+          </form>
+
+          <!-- Results Section -->
+          <div id="results-section" class="results-section hidden">
+            <div class="results-header">
+              <h2>Calculation Results</h2>
+              <span class="search-id">Search ID: <span id="search-id-value">-</span></span>
+            </div>
+            
+            <div class="results-grid">
+              <!-- Title Premiums -->
+              <div class="result-card premium-card">
+                <div class="card-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <h3>Title Premiums</h3>
+                </div>
+                <div class="card-body">
+                  <div class="premium-row">
+                    <div class="premium-item">
+                      <span class="premium-label">Loan Policy</span>
+                      <div class="premium-values">
+                        <span class="borrower" title="Borrower">B: $<span id="loan-policy-borrower">0</span></span>
+                        <span class="seller" title="Seller">S: $<span id="loan-policy-seller">0</span></span>
+                      </div>
+                    </div>
+                    <div class="premium-item">
+                      <span class="premium-label">Owner's Policy</span>
+                      <div class="premium-values">
+                        <span class="borrower" title="Borrower">B: $<span id="owners-policy-borrower">0</span></span>
+                        <span class="seller" title="Seller">S: $<span id="owners-policy-seller">0</span></span>
+                      </div>
+                    </div>
+                    <div class="premium-item">
+                      <span class="premium-label">Sim Issue</span>
+                      <span class="premium-value">$<span id="simissue">0</span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Title Agent Fees -->
+              <div class="result-card">
+                <div class="card-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                  <h3>Title Agent Fees</h3>
+                </div>
+                <div class="card-body">
+                  <div class="fee-tabs">
+                    <button class="fee-tab active" data-target="borrower-fees">Borrower</button>
+                    <button class="fee-tab" data-target="seller-fees">Seller</button>
+                  </div>
+                  <div id="borrower-fees" class="fee-list active"></div>
+                  <div id="seller-fees" class="fee-list"></div>
+                </div>
+              </div>
+
+              <!-- Recording Fees -->
+              <div class="result-card">
+                <div class="card-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  <h3>Recording Fees</h3>
+                </div>
+                <div class="card-body">
+                  <div id="recording-fees" class="fee-list"></div>
+                </div>
+              </div>
+
+              <!-- Transfer Taxes -->
+              <div class="result-card">
+                <div class="card-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="1" x2="12" y2="23"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                  </svg>
+                  <h3>Transfer Taxes</h3>
+                </div>
+                <div class="card-body">
+                  <div class="fee-tabs">
+                    <button class="fee-tab active" data-target="borrower-taxes">Borrower</button>
+                    <button class="fee-tab" data-target="seller-taxes">Seller</button>
+                    <button class="fee-tab" data-target="lender-taxes">Lender</button>
+                  </div>
+                  <div id="borrower-taxes" class="fee-list active"></div>
+                  <div id="seller-taxes" class="fee-list"></div>
+                  <div id="lender-taxes" class="fee-list"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="results-summary">
+              <div class="summary-item">
+                <span class="summary-label">Total Borrower Costs</span>
+                <span class="summary-value" id="total-borrower">$0</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Total Seller Costs</span>
+                <span class="summary-value" id="total-seller">$0</span>
+              </div>
+              <div class="summary-item total">
+                <span class="summary-label">Grand Total</span>
+                <span class="summary-value" id="grand-total">$0</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Property Tax View -->
+        <section id="property-tax-view" class="view">
+          <div class="view-header">
+            <h1>Property Tax Lookup</h1>
+            <p>Get estimated property tax information for any address</p>
+          </div>
+
+          <form id="property-tax-form" class="calculator-form">
+            <div class="form-grid">
+              <div class="form-section">
+                <h3 class="section-title">Property Information</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="pt-state">State *</label>
+                    <select id="pt-state" required>
+                      <option value="">Select State</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="pt-county">County *</label>
+                    <input type="text" id="pt-county" placeholder="Hudson" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="pt-city">City *</label>
+                    <input type="text" id="pt-city" placeholder="Hoboken" required>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="pt-address">Address *</label>
+                  <input type="text" id="pt-address" placeholder="110 Jefferson St. Apt 2" required>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="pt-close-date">Close Date *</label>
+                    <input type="date" id="pt-close-date" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="pt-purchase-price">Purchase Price ($) *</label>
+                    <input type="number" id="pt-purchase-price" placeholder="300000" required>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-large">
+                <span>Lookup Property Tax</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </button>
+            </div>
+          </form>
+
+          <div id="property-tax-results" class="results-section hidden">
+            <div class="results-header">
+              <h2>Property Tax Information</h2>
+            </div>
+            <div id="property-tax-content" class="property-tax-content"></div>
+          </div>
+        </section>
+
+        <!-- Endorsements View -->
+        <section id="endorsements-view" class="view">
+          <div class="view-header">
+            <h1>Available Endorsements</h1>
+            <p>View endorsements available for a specific location and transaction type</p>
+          </div>
+
+          <form id="endorsements-form" class="calculator-form">
+            <div class="form-grid">
+              <div class="form-section">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="endo-state">State *</label>
+                    <select id="endo-state" required>
+                      <option value="">Select State</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="endo-county">County *</label>
+                    <input type="text" id="endo-county" placeholder="Hudson" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="endo-purpose">Transaction Type *</label>
+                    <select id="endo-purpose" required>
+                      <option value="11">Purchase</option>
+                      <option value="00">Refinance</option>
+                      <option value="04">Refinance (Reissue)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Get Endorsements</button>
+            </div>
+          </form>
+
+          <div id="endorsements-results" class="results-section hidden">
+            <div id="endorsements-list" class="endorsements-grid"></div>
+          </div>
+        </section>
+
+        <!-- Locations View -->
+        <section id="locations-view" class="view">
+          <div class="view-header">
+            <h1>Location Data</h1>
+            <p>Browse available counties and townships</p>
+          </div>
+
+          <div class="location-browser">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="loc-state">Select State</label>
+                <select id="loc-state">
+                  <option value="">Select State</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="location-results">
+              <div class="location-column">
+                <h3>Counties</h3>
+                <div id="counties-list" class="location-list"></div>
+              </div>
+              <div class="location-column">
+                <h3>Townships</h3>
+                <div id="townships-list" class="location-list">
+                  <p class="placeholder-text">Select a county to view townships</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <span>Processing...</span>
+      </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
