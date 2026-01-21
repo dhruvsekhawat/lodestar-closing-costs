@@ -4,7 +4,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const CLIENT_NAME = process.env.LODESTAR_CLIENT_NAME || 'SettleWise';
+  const CLIENT_NAME = process.env.LODESTAR_CLIENT_NAME || 'LodeStar_Discovery_API';
   const USERNAME = process.env.LODESTAR_USERNAME;
   const PASSWORD = process.env.LODESTAR_PASSWORD;
 
@@ -31,7 +31,12 @@ module.exports = async function handler(req, res) {
     const data = JSON.parse(text);
     
     if (data.session_id) {
-      return res.status(200).json({ success: true, session_id: data.session_id, username: USERNAME });
+      return res.status(200).json({ 
+        success: true, 
+        session_id: data.session_id, 
+        username: USERNAME,
+        uri_path: data.uri_path
+      });
     } else {
       return res.status(401).json({ success: false, error: data.error || 'Login failed' });
     }

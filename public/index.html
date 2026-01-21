@@ -13,7 +13,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  <!-- Prevent phone number detection -->
   <meta name="format-detection" content="telephone=no">
 </head>
 <body>
@@ -71,12 +70,37 @@
             </svg>
             Endorsements
           </button>
+          <button class="nav-item" data-view="questions">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            Questions
+          </button>
+          <button class="nav-item" data-view="sub-agents">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Sub-Agents
+          </button>
           <button class="nav-item" data-view="locations">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
               <circle cx="12" cy="10" r="3"/>
             </svg>
             Locations
+          </button>
+          <button class="nav-item" data-view="geocode">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            Geocode Check
           </button>
         </div>
       </nav>
@@ -119,6 +143,13 @@
                   <label for="cc-address">Property Address</label>
                   <input type="text" id="cc-address" placeholder="123 Main St, Apt 1">
                 </div>
+                <button type="button" class="btn btn-secondary btn-small" id="geocode-check-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                  </svg>
+                  Verify Township
+                </button>
               </div>
 
               <!-- Transaction Section -->
@@ -140,6 +171,10 @@
                       <option value="Title">Title Only</option>
                     </select>
                   </div>
+                  <div class="form-group">
+                    <label for="cc-filename">File/Loan Name</label>
+                    <input type="text" id="cc-filename" placeholder="Loan-12345">
+                  </div>
                 </div>
                 <div class="form-row">
                   <div class="form-group">
@@ -157,10 +192,29 @@
                 </div>
               </div>
 
+              <!-- Refinance Section (conditional) -->
+              <div class="form-section" id="refinance-section" style="display:none;">
+                <h3 class="section-title">Refinance Details</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="cc-prior-insurance">Prior Insurance Amount ($)</label>
+                    <input type="number" id="cc-prior-insurance" placeholder="0">
+                  </div>
+                  <div class="form-group">
+                    <label for="cc-exdebt">Existing Debt ($)</label>
+                    <input type="number" id="cc-exdebt" placeholder="0">
+                  </div>
+                  <div class="form-group">
+                    <label for="cc-prior-insurance-date">Prior Insurance Date</label>
+                    <input type="date" id="cc-prior-insurance-date">
+                  </div>
+                </div>
+              </div>
+
               <!-- Loan Info Section -->
               <div class="form-section collapsible">
                 <h3 class="section-title" data-toggle="loan-info">
-                  <span>Loan Information (Optional)</span>
+                  <span>Loan Information</span>
                   <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"/>
                   </svg>
@@ -200,17 +254,234 @@
                     </div>
                   </div>
                   <div class="form-row">
+                    <div class="form-group">
+                      <label for="cc-prop-purpose">Property Purpose</label>
+                      <select id="cc-prop-purpose">
+                        <option value="">Not Specified</option>
+                        <option value="1">Primary Residence</option>
+                        <option value="2">Secondary Residence</option>
+                        <option value="3">Investment Property</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="cc-prop-usage">Property Usage</label>
+                      <select id="cc-prop-usage">
+                        <option value="">Not Specified</option>
+                        <option value="1">Residential</option>
+                        <option value="2">Commercial</option>
+                        <option value="3">Mixed-Use</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="cc-num-families">Number of Families</label>
+                      <input type="number" id="cc-num-families" placeholder="1" min="1" max="4">
+                    </div>
+                  </div>
+                  <div class="form-row checkbox-row">
                     <div class="form-group checkbox-group">
-                      <label>
-                        <input type="checkbox" id="cc-first-time-buyer">
-                        First Time Home Buyer
-                      </label>
+                      <label><input type="checkbox" id="cc-first-time-buyer"> First Time Home Buyer</label>
                     </div>
                     <div class="form-group checkbox-group">
-                      <label>
-                        <input type="checkbox" id="cc-federal-credit-union">
-                        Federal Credit Union Lender
-                      </label>
+                      <label><input type="checkbox" id="cc-federal-credit-union"> Federal Credit Union Lender</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-same-lender"> Same Lender as Previous</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-same-borrowers"> Same Borrowers as Previous</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Policy Levels Section -->
+              <div class="form-section collapsible collapsed">
+                <h3 class="section-title" data-toggle="policy-levels">
+                  <span>Policy Levels</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </h3>
+                <div id="policy-levels" class="collapsible-content">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="cc-loanpol-level">Loan Policy Level</label>
+                      <select id="cc-loanpol-level">
+                        <option value="">Not Specified</option>
+                        <option value="1">Standard</option>
+                        <option value="2">Enhanced</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="cc-owners-level">Owner's Policy Level</label>
+                      <select id="cc-owners-level">
+                        <option value="">Not Specified</option>
+                        <option value="1">Standard</option>
+                        <option value="2">Enhanced</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sub-Agent Selection -->
+              <div class="form-section collapsible collapsed">
+                <h3 class="section-title" data-toggle="sub-agent-section">
+                  <span>Title Agent Selection</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </h3>
+                <div id="sub-agent-section" class="collapsible-content">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="cc-client-id">Title Agent</label>
+                      <select id="cc-client-id">
+                        <option value="">Use Default</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="cc-agent-id">Agent Office ID</label>
+                      <input type="number" id="cc-agent-id" placeholder="1" value="1">
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-small" id="load-sub-agents-btn">Load Available Agents</button>
+                </div>
+              </div>
+
+              <!-- Endorsements Section -->
+              <div class="form-section collapsible collapsed">
+                <h3 class="section-title" data-toggle="endorsements-section">
+                  <span>Endorsements</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </h3>
+                <div id="endorsements-section" class="collapsible-content">
+                  <button type="button" class="btn btn-secondary btn-small" id="load-endorsements-btn">Load Available Endorsements</button>
+                  <div id="cc-endorsements-list" class="endorsements-inline-list"></div>
+                </div>
+              </div>
+
+              <!-- Dynamic Questions Section -->
+              <div class="form-section collapsible collapsed" id="questions-section">
+                <h3 class="section-title" data-toggle="questions-content">
+                  <span>Additional Questions</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </h3>
+                <div id="questions-content" class="collapsible-content">
+                  <button type="button" class="btn btn-secondary btn-small" id="load-questions-btn">Load Questions for This Location</button>
+                  <div id="cc-questions-list" class="questions-list"></div>
+                </div>
+              </div>
+
+              <!-- Document Types Section -->
+              <div class="form-section collapsible collapsed">
+                <h3 class="section-title" data-toggle="documents-section">
+                  <span>Document Specifications</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </h3>
+                <div id="documents-section" class="collapsible-content">
+                  <p class="helper-text">Specify page counts and details for recording fee calculations</p>
+                  <div class="doc-type-grid">
+                    <div class="doc-type-item">
+                      <h4>Deed</h4>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Pages</label>
+                          <input type="number" id="doc-deed-pages" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                          <label>Grantors</label>
+                          <input type="number" id="doc-deed-grantors" placeholder="1" min="1" value="1">
+                        </div>
+                        <div class="form-group">
+                          <label>Grantees</label>
+                          <input type="number" id="doc-deed-grantees" placeholder="1" min="1" value="1">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="doc-type-item">
+                      <h4>Mortgage</h4>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Pages</label>
+                          <input type="number" id="doc-mort-pages" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                          <label>Grantors</label>
+                          <input type="number" id="doc-mort-grantors" placeholder="1" min="1" value="1">
+                        </div>
+                        <div class="form-group">
+                          <label>Grantees</label>
+                          <input type="number" id="doc-mort-grantees" placeholder="1" min="1" value="1">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="doc-type-item">
+                      <h4>Release</h4>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Pages</label>
+                          <input type="number" id="doc-release-pages" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                          <label>Count</label>
+                          <input type="number" id="doc-release-count" placeholder="1" min="1" value="1">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="doc-type-item">
+                      <h4>Assignment</h4>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Pages</label>
+                          <input type="number" id="doc-assign-pages" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                          <label>Count</label>
+                          <input type="number" id="doc-assign-count" placeholder="1" min="1" value="1">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Output Options Section -->
+              <div class="form-section collapsible collapsed">
+                <h3 class="section-title" data-toggle="output-options">
+                  <span>Output Options</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </h3>
+                <div id="output-options" class="collapsible-content">
+                  <div class="form-row checkbox-row">
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-include-full-policy"> Include Full Policy Amounts</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-include-section"> Include LE/CD Section Mapping</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-include-payee"> Include Payee Info</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-include-pdf"> Include PDF Output</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-include-seller-responsible"> Include Seller Responsible Flags</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-include-property-tax"> Include Property Tax (Extra Charge)</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label><input type="checkbox" id="cc-include-appraisal"> Include Appraisal (Extra Charge)</label>
                     </div>
                   </div>
                 </div>
@@ -233,7 +504,17 @@
           <div id="results-section" class="results-section hidden">
             <div class="results-header">
               <h2>Calculation Results</h2>
-              <span class="search-id">Search ID: <span id="search-id-value">-</span></span>
+              <div class="results-meta">
+                <span class="search-id">Search ID: <span id="search-id-value">-</span></span>
+                <button type="button" class="btn btn-secondary btn-small" id="download-pdf-btn" style="display:none;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download PDF
+                </button>
+              </div>
             </div>
             
             <div class="results-grid">
@@ -264,6 +545,34 @@
                     <div class="premium-item">
                       <span class="premium-label">Sim Issue</span>
                       <span class="premium-value">$<span id="simissue">0</span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Full Policy Amounts (conditional) -->
+              <div class="result-card" id="full-policy-card" style="display:none;">
+                <div class="card-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <h3>Full Policy Amounts</h3>
+                </div>
+                <div class="card-body">
+                  <div class="premium-row">
+                    <div class="premium-item">
+                      <span class="premium-label">Full Loan Policy</span>
+                      <div class="premium-values">
+                        <span class="borrower">B: $<span id="full-loan-policy-borrower">0</span></span>
+                        <span class="seller">S: $<span id="full-loan-policy-seller">0</span></span>
+                      </div>
+                    </div>
+                    <div class="premium-item">
+                      <span class="premium-label">Full Owner's Policy</span>
+                      <div class="premium-values">
+                        <span class="borrower">B: $<span id="full-owners-policy-borrower">0</span></span>
+                        <span class="seller">S: $<span id="full-owners-policy-seller">0</span></span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -341,6 +650,12 @@
                 <span class="summary-value" id="grand-total">$0</span>
               </div>
             </div>
+
+            <!-- Raw JSON Toggle -->
+            <div class="raw-json-section">
+              <button type="button" class="btn btn-secondary btn-small" id="toggle-raw-json">Show Raw JSON</button>
+              <pre id="raw-json-output" class="raw-json hidden"></pre>
+            </div>
           </div>
         </section>
 
@@ -383,6 +698,10 @@
                   <div class="form-group">
                     <label for="pt-purchase-price">Purchase Price ($) *</label>
                     <input type="number" id="pt-purchase-price" placeholder="300000" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="pt-file-name">File Name</label>
+                    <input type="text" id="pt-file-name" placeholder="WebApp">
                   </div>
                 </div>
               </div>
@@ -449,6 +768,96 @@
           </div>
         </section>
 
+        <!-- Questions View -->
+        <section id="questions-view" class="view">
+          <div class="view-header">
+            <h1>Dynamic Questions</h1>
+            <p>View questions required for specific states and transaction types</p>
+          </div>
+
+          <form id="questions-form" class="calculator-form">
+            <div class="form-grid">
+              <div class="form-section">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="qst-state">State *</label>
+                    <select id="qst-state" required>
+                      <option value="">Select State</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="qst-purpose">Transaction Type *</label>
+                    <select id="qst-purpose" required>
+                      <option value="11">Purchase</option>
+                      <option value="00">Refinance</option>
+                      <option value="04">Refinance (Reissue)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Get Questions</button>
+            </div>
+          </form>
+
+          <div id="questions-results" class="results-section hidden">
+            <div class="results-header">
+              <h2>Available Questions</h2>
+              <p class="helper-text">These questions may need to be answered for accurate calculations</p>
+            </div>
+            <div id="questions-list" class="questions-grid"></div>
+          </div>
+        </section>
+
+        <!-- Sub-Agents View -->
+        <section id="sub-agents-view" class="view">
+          <div class="view-header">
+            <h1>Sub-Agents</h1>
+            <p>View available title/escrow agents for a specific location</p>
+          </div>
+
+          <div class="calculator-form">
+            <div class="form-section">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="sa-state">State *</label>
+                  <select id="sa-state" required>
+                    <option value="">Select State</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="sa-county">County *</label>
+                  <input type="text" id="sa-county" placeholder="Orange" required>
+                </div>
+                <div class="form-group">
+                  <label for="sa-purpose">Transaction Type *</label>
+                  <select id="sa-purpose" required>
+                    <option value="11">Purchase</option>
+                    <option value="00">Refinance</option>
+                    <option value="04">Refinance (Reissue)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group checkbox-group">
+                  <label><input type="checkbox" id="sa-include-contact" checked> Include Contact Information</label>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary" id="load-sub-agents">Load Sub-Agents</button>
+            </div>
+          </div>
+
+          <div id="sub-agents-results" class="results-section hidden">
+            <div class="results-header">
+              <h2>Available Sub-Agents</h2>
+            </div>
+            <div id="sub-agents-list" class="sub-agents-grid"></div>
+          </div>
+        </section>
+
         <!-- Locations View -->
         <section id="locations-view" class="view">
           <div class="view-header">
@@ -478,6 +887,53 @@
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        <!-- Geocode Check View -->
+        <section id="geocode-view" class="view">
+          <div class="view-header">
+            <h1>Geocode Check</h1>
+            <p>Verify the correct tax-relevant township for an address</p>
+          </div>
+
+          <form id="geocode-form" class="calculator-form">
+            <div class="form-grid">
+              <div class="form-section">
+                <h3 class="section-title">Address Verification</h3>
+                <p class="helper-text">This helps resolve cases where mailing address differs from tax jurisdiction (common in PA, NJ)</p>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="geo-state">State *</label>
+                    <select id="geo-state" required>
+                      <option value="">Select State</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="geo-county">County *</label>
+                    <input type="text" id="geo-county" placeholder="Delaware" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="geo-township">Township/City *</label>
+                    <input type="text" id="geo-township" placeholder="Media" required>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="geo-address">Street Address *</label>
+                  <input type="text" id="geo-address" placeholder="229 Summit Rd" required>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Verify Location</button>
+            </div>
+          </form>
+
+          <div id="geocode-results" class="results-section hidden">
+            <div class="results-header">
+              <h2>Geocode Results</h2>
+            </div>
+            <div id="geocode-content" class="geocode-content"></div>
           </div>
         </section>
       </div>

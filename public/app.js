@@ -4,7 +4,14 @@ const state = {
   isConnected: false,
   counties: [],
   townships: [],
-  selectedCounty: null
+  selectedCounty: null,
+  endorsements: [],
+  selectedEndorsements: [],
+  questions: [],
+  questionAnswers: {},
+  subAgents: [],
+  lastResponse: null,
+  pdfBase64: null
 };
 
 // US States list
@@ -40,7 +47,9 @@ const elements = {
   ccState: document.getElementById('cc-state'),
   ccCounty: document.getElementById('cc-county'),
   ccTownship: document.getElementById('cc-township'),
+  ccPurpose: document.getElementById('cc-purpose'),
   resultsSection: document.getElementById('results-section'),
+  refinanceSection: document.getElementById('refinance-section'),
   
   // Property Tax
   ptForm: document.getElementById('property-tax-form'),
@@ -52,10 +61,23 @@ const elements = {
   endoState: document.getElementById('endo-state'),
   endoResults: document.getElementById('endorsements-results'),
   
+  // Questions
+  qstForm: document.getElementById('questions-form'),
+  qstState: document.getElementById('qst-state'),
+  qstResults: document.getElementById('questions-results'),
+  
+  // Geocode
+  geoForm: document.getElementById('geocode-form'),
+  geoState: document.getElementById('geo-state'),
+  geoResults: document.getElementById('geocode-results'),
+  
   // Locations
   locState: document.getElementById('loc-state'),
   countiesList: document.getElementById('counties-list'),
-  townshipsList: document.getElementById('townships-list')
+  townshipsList: document.getElementById('townships-list'),
+  
+  // Sub-Agents
+  subAgentsResults: document.getElementById('sub-agents-results')
 };
 
 // ==================== Utility Functions ====================
@@ -121,6 +143,7 @@ async function connect() {
 
 function updateConnectionStatus(connected, username = '') {
   elements.sessionStatus.classList.toggle('connected', connected);
+  elements.sessionStatus.classList.toggle('disconnected', !connected);
   elements.sessionStatus.querySelector('.status-text').textContent = 
     connected ? `Connected (${username})` : 'Not Connected';
   elements.connectBtn.textContent = connected ? 'Reconnect' : 'Connect';
@@ -128,7 +151,11 @@ function updateConnectionStatus(connected, username = '') {
 
 // ==================== State Selects ====================
 function populateStateSelects() {
-  const stateSelects = [elements.ccState, elements.ptState, elements.endoState, elements.locState];
+  const saState = document.getElementById('sa-state');
+  const stateSelects = [
+    elements.ccState, elements.ptState, elements.endoState, 
+    elements.qstState, elements.geoState, elements.locState, saState
+  ];
   
   stateSelects.forEach(select => {
     if (!select) return;
@@ -164,7 +191,7 @@ async function loadCounties(stateCode, targetSelect, callback) {
       
       if (callback) callback(response.counties);
     } else {
-      showToast(response.message || 'Failed to load counties', 'error');
+      showToast(response.message || response.error || 'Failed to load counties', 'error');
     }
   } catch (error) {
     showToast('Failed to load counties', 'error');
@@ -193,12 +220,314 @@ async function loadTownships(stateCode, countyName, targetSelect, callback) {
       
       if (callback) callback(response.townships);
     } else {
-      showToast(response.message || 'Failed to load townships', 'error');
+      showToast(response.message || response.error || 'Failed to load townships', 'error');
     }
   } catch (error) {
     showToast('Failed to load townships', 'error');
   }
   hideLoading();
+}
+
+// ==================== Geocode Check ====================
+async function geocodeCheck(formData) {
+  showLoading();
+  try {
+    const params = new URLSearchParams({
+      state: formData.state,
+      county: formData.county,
+      township: formData.township,
+      address: formData.address,
+      session_id: state.sessionId
+    });
+
+    const response = await apiCall(`/api/geocode-check?${params}`);
+    
+    if (response.error) {
+      showToast(response.error, 'error');
+    } else {
+      displayGeocodeResults(response);
+      showToast('Geocode check complete', 'success');
+    }
+  } catch (error) {
+    showToast('Geocode check failed: ' + error.message, 'error');
+  }
+  hideLoading();
+}
+
+function displayGeocodeResults(data) {
+  elements.geoResults.classList.remove('hidden');
+  const container = document.getElementById('geocode-content');
+  
+  if (data.status === 0 || data.message) {
+    container.innerHTML = `
+      <div class="result-card">
+        <p style="color: var(--text-secondary);">${data.message || 'No geocode data found'}</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="result-card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <h3>Resolved Location</h3>
+      </div>
+      <div class="card-body">
+        <div class="info-row">
+          <span class="info-label">Suggested County:</span>
+          <span class="info-value">${data.suggested_county || 'N/A'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Suggested Township:</span>
+          <span class="info-value highlight">${data.suggested_township || 'N/A'}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (data.township_options && data.township_options.length > 0) {
+    html += `
+      <div class="result-card">
+        <div class="card-header">
+          <h3>Other Township Options</h3>
+        </div>
+        <div class="card-body">
+          <div class="township-options">
+            ${data.township_options.map(t => `<span class="option-badge">${t}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+}
+
+// ==================== Questions ====================
+async function loadQuestions(stateCode, purpose) {
+  showLoading();
+  try {
+    const params = new URLSearchParams({
+      state: stateCode,
+      purpose: purpose,
+      session_id: state.sessionId
+    });
+
+    const response = await apiCall(`/api/questions?${params}`);
+    
+    if (response.error) {
+      showToast(response.error, 'error');
+      return [];
+    } else {
+      state.questions = response || [];
+      return response;
+    }
+  } catch (error) {
+    showToast('Failed to load questions: ' + error.message, 'error');
+    return [];
+  } finally {
+    hideLoading();
+  }
+}
+
+function displayQuestions(questions, containerId) {
+  const container = document.getElementById(containerId);
+  
+  if (!questions || questions.length === 0) {
+    container.innerHTML = '<p class="placeholder-text">No questions available for this state/transaction type</p>';
+    return;
+  }
+
+  container.innerHTML = questions.map((q, idx) => {
+    let inputHtml = '';
+    const inputId = `qst-input-${idx}`;
+    const name = q.name || `Q${idx}`;
+    
+    switch (q.input_type) {
+      case 'checkbox':
+        const checked = q.default_value === true || q.default_value === 'checked' || q.default_value === 1;
+        inputHtml = `<input type="checkbox" id="${inputId}" data-qst-name="${name}" ${checked ? 'checked' : ''}>`;
+        break;
+      case 'number':
+        inputHtml = `<input type="number" id="${inputId}" data-qst-name="${name}" value="${q.default_value || ''}" placeholder="0">`;
+        break;
+      case 'date':
+        inputHtml = `<input type="date" id="${inputId}" data-qst-name="${name}" value="${q.default_value || ''}">`;
+        break;
+      default:
+        inputHtml = `<input type="text" id="${inputId}" data-qst-name="${name}" value="${q.default_value || ''}" placeholder="">`;
+    }
+
+    return `
+      <div class="question-item">
+        <label for="${inputId}">
+          ${q.label || name}
+          ${q.related_doc ? `<span class="question-doc">(${q.related_doc})</span>` : ''}
+        </label>
+        ${inputHtml}
+        ${q.categories && q.categories.length > 0 ? 
+          `<div class="question-categories">${q.categories.map(c => `<span class="category-tag">${c}</span>`).join('')}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function collectQuestionAnswers(containerId) {
+  const container = document.getElementById(containerId);
+  const answers = {};
+  
+  container.querySelectorAll('[data-qst-name]').forEach(input => {
+    const name = input.dataset.qstName;
+    if (input.type === 'checkbox') {
+      answers[name] = input.checked ? '1' : '0';
+    } else if (input.value) {
+      answers[name] = input.value;
+    }
+  });
+  
+  return answers;
+}
+
+// ==================== Endorsements ====================
+async function loadEndorsements(stateCode, county, purpose) {
+  showLoading();
+  try {
+    const params = new URLSearchParams({ 
+      state: stateCode, 
+      county, 
+      purpose, 
+      session_id: state.sessionId 
+    });
+    const response = await apiCall(`/api/endorsements?${params}`);
+    
+    if (response.error) {
+      showToast(response.error, 'error');
+      return [];
+    } else {
+      state.endorsements = response.endorsements || [];
+      return response.endorsements || [];
+    }
+  } catch (error) {
+    showToast('Failed to load endorsements', 'error');
+    return [];
+  } finally {
+    hideLoading();
+  }
+}
+
+function displayEndorsements(endorsements, containerId, isInline = false) {
+  const container = document.getElementById(containerId);
+  
+  if (!endorsements || endorsements.length === 0) {
+    container.innerHTML = '<p class="placeholder-text">No endorsements available</p>';
+    return;
+  }
+  
+  const className = isInline ? 'endorsement-item-inline' : 'endorsement-card';
+  
+  container.innerHTML = endorsements.map(endo => `
+    <div class="${className} ${endo.default === 1 ? 'default' : ''}">
+      <input type="checkbox" class="endorsement-checkbox" ${endo.default === 1 ? 'checked' : ''} 
+             data-endo-id="${endo.endo_id}">
+      <div class="endorsement-info">
+        <div class="endorsement-name">${endo.name}</div>
+        <div class="endorsement-id">ID: ${endo.endo_id} ${endo.fee_id ? `| Fee: ${endo.fee_id}` : ''}</div>
+      </div>
+      ${endo.default === 1 ? '<span class="endorsement-badge">Default</span>' : ''}
+    </div>
+  `).join('');
+}
+
+function collectSelectedEndorsements(containerId) {
+  const container = document.getElementById(containerId);
+  const selected = [];
+  
+  container.querySelectorAll('.endorsement-checkbox:checked').forEach(checkbox => {
+    selected.push(checkbox.dataset.endoId);
+  });
+  
+  return selected;
+}
+
+// ==================== Sub-Agents ====================
+async function loadSubAgents(includeContact = false, stateCode = null, county = null, purpose = null) {
+  showLoading();
+  try {
+    const params = new URLSearchParams({ session_id: state.sessionId });
+    
+    // Sub-agents requires state, county, purpose
+    if (stateCode) params.append('state', stateCode);
+    if (county) params.append('county', county);
+    if (purpose) params.append('purpose', purpose);
+    if (includeContact) params.append('include_contact_info', '1');
+    
+    const response = await apiCall(`/api/sub-agents?${params}`);
+    
+    if (response.error) {
+      showToast(response.error, 'error');
+    } else {
+      state.subAgents = response.sub_agents || [];
+      displaySubAgents(response.sub_agents || [], includeContact);
+      elements.subAgentsResults.classList.remove('hidden');
+    }
+  } catch (error) {
+    showToast('Failed to load sub-agents: ' + error.message, 'error');
+  }
+  hideLoading();
+}
+
+function displaySubAgents(subAgents, includeContact = false) {
+  const container = document.getElementById('sub-agents-list');
+  
+  if (!subAgents || subAgents.length === 0) {
+    container.innerHTML = '<p class="placeholder-text">No sub-agents available</p>';
+    return;
+  }
+
+  const relationTypes = {
+    1: 'Full Service (Title + Settlement)',
+    2: 'Settlement/Escrow Only',
+    4: 'Title Only'
+  };
+
+  container.innerHTML = subAgents.map(agent => `
+    <div class="sub-agent-card">
+      <div class="sub-agent-header">
+        <h4>${agent.name}</h4>
+        <span class="relation-type">${relationTypes[agent.relation_type] || 'Unknown'}</span>
+      </div>
+      <div class="sub-agent-ids">
+        <span>Client ID: ${agent.sub_agent_id}</span>
+        <span>Office ID: ${agent.sub_agent_office_id}</span>
+      </div>
+      ${agent.contact_info ? `
+        <div class="sub-agent-contact">
+          <p><strong>${agent.contact_info.client_name || ''}</strong></p>
+          <p>${agent.contact_info.contact_name || ''}</p>
+          <p>${agent.contact_info.address || ''}</p>
+          <p>${agent.contact_info.city || ''}, ${agent.contact_info.state || ''} ${agent.contact_info.zip || ''}</p>
+          <p>${agent.contact_info.phone || ''}</p>
+          ${agent.contact_info.is_multi_office ? '<span class="multi-office-badge">Multi-Office</span>' : ''}
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
+  
+  // Also populate the dropdown in closing costs form
+  const clientSelect = document.getElementById('cc-client-id');
+  if (clientSelect) {
+    clientSelect.innerHTML = '<option value="">Use Default</option>';
+    subAgents.forEach(agent => {
+      const option = document.createElement('option');
+      option.value = agent.sub_agent_id;
+      option.textContent = `${agent.name} (${agent.sub_agent_id})`;
+      clientSelect.appendChild(option);
+    });
+  }
 }
 
 // ==================== Closing Costs ====================
@@ -207,31 +536,78 @@ async function calculateClosingCosts(formData) {
   try {
     const requestBody = {
       session_id: state.sessionId,
+      // Required
       state: formData.state,
       county: formData.county,
       township: formData.township,
       search_type: formData.searchType,
       purpose: formData.purpose,
+      
+      // Financial
       loan_amount: parseFloat(formData.loanAmount) || 0,
       purchase_price: parseFloat(formData.purchasePrice) || 0
     };
 
+    // Optional fields
+    if (formData.filename) requestBody.filename = formData.filename;
     if (formData.address) requestBody.address = formData.address;
     if (formData.closeDate) requestBody.close_date = formData.closeDate;
     
-    // Add loan info if provided
+    // Refinance fields
+    if (formData.priorInsurance) requestBody.prior_insurance = parseFloat(formData.priorInsurance);
+    if (formData.exdebt) requestBody.exdebt = parseFloat(formData.exdebt);
+    if (formData.priorInsuranceDate) requestBody.prior_insurance_date = formData.priorInsuranceDate;
+    
+    // Loan info
     const loanInfo = {};
     if (formData.propType) loanInfo.prop_type = parseInt(formData.propType);
     if (formData.loanType) loanInfo.loan_type = parseInt(formData.loanType);
     if (formData.amortType) loanInfo.amort_type = parseInt(formData.amortType);
+    if (formData.propPurpose) loanInfo.prop_purpose = parseInt(formData.propPurpose);
+    if (formData.propUsage) loanInfo.prop_usage = parseInt(formData.propUsage);
+    if (formData.numFamilies) loanInfo.number_of_families = parseInt(formData.numFamilies);
     if (formData.firstTimeBuyer) loanInfo.is_first_time_home_buyer = 1;
     if (formData.federalCreditUnion) loanInfo.is_federal_credit_union = 1;
+    if (formData.sameLender) loanInfo.is_same_lender_as_previous = 1;
+    if (formData.sameBorrowers) loanInfo.is_same_borrowers_as_previous = 1;
     
     if (Object.keys(loanInfo).length > 0) {
       requestBody.loan_info = loanInfo;
     }
 
-    console.log('Request:', requestBody);
+    // Policy levels
+    if (formData.loanpolLevel) requestBody.loanpol_level = parseInt(formData.loanpolLevel);
+    if (formData.ownersLevel) requestBody.owners_level = parseInt(formData.ownersLevel);
+    
+    // Sub-agent
+    if (formData.clientId) requestBody.client_id = parseInt(formData.clientId);
+    if (formData.agentId) requestBody.agent_id = parseInt(formData.agentId);
+    
+    // Endorsements
+    if (formData.endorsements && formData.endorsements.length > 0) {
+      requestBody.request_endos = formData.endorsements;
+    }
+    
+    // Questions
+    if (formData.qst && Object.keys(formData.qst).length > 0) {
+      requestBody.qst = formData.qst;
+    }
+    
+    // Document types
+    if (formData.docType) {
+      requestBody.doc_type = formData.docType;
+    }
+    
+    // Output options
+    if (formData.includeFullPolicy) requestBody.include_full_policy_amount = 1;
+    if (formData.includeSection) requestBody.include_section = 1;
+    if (formData.includePayee) requestBody.include_payee_info = 1;
+    if (formData.includePdf) requestBody.include_pdf = 1;
+    if (formData.includeSellerResponsible) requestBody.include_seller_responsible = 1;
+    if (formData.includePropertyTax) requestBody.include_property_tax = 1;
+    if (formData.includeAppraisal) requestBody.include_appraisal = 1;
+
+    console.log('Request:', JSON.stringify(requestBody, null, 2));
     
     const response = await apiCall('/api/closing-costs', {
       method: 'POST',
@@ -239,11 +615,12 @@ async function calculateClosingCosts(formData) {
     });
 
     console.log('Response:', response);
+    state.lastResponse = response;
     
     if (response.error) {
       showToast(response.error, 'error');
     } else {
-      displayClosingCostResults(response);
+      displayClosingCostResults(response, formData.includeFullPolicy, formData.includePdf);
       showToast('Calculation complete', 'success');
     }
   } catch (error) {
@@ -252,7 +629,7 @@ async function calculateClosingCosts(formData) {
   hideLoading();
 }
 
-function displayClosingCostResults(data) {
+function displayClosingCostResults(data, showFullPolicy = false, showPdf = false) {
   elements.resultsSection.classList.remove('hidden');
   
   // Search ID
@@ -264,6 +641,27 @@ function displayClosingCostResults(data) {
   document.getElementById('owners-policy-borrower').textContent = formatCurrency(data.owners_policy_premium?.borrower);
   document.getElementById('owners-policy-seller').textContent = formatCurrency(data.owners_policy_premium?.seller);
   document.getElementById('simissue').textContent = formatCurrency(data.simissue);
+  
+  // Full policy amounts (if requested)
+  const fullPolicyCard = document.getElementById('full-policy-card');
+  if (showFullPolicy && data.full_loan_policy_premium) {
+    fullPolicyCard.style.display = 'block';
+    document.getElementById('full-loan-policy-borrower').textContent = formatCurrency(data.full_loan_policy_premium?.borrower);
+    document.getElementById('full-loan-policy-seller').textContent = formatCurrency(data.full_loan_policy_premium?.seller);
+    document.getElementById('full-owners-policy-borrower').textContent = formatCurrency(data.full_owners_policy_premium?.borrower);
+    document.getElementById('full-owners-policy-seller').textContent = formatCurrency(data.full_owners_policy_premium?.seller);
+  } else {
+    fullPolicyCard.style.display = 'none';
+  }
+  
+  // PDF download button
+  const pdfBtn = document.getElementById('download-pdf-btn');
+  if (showPdf && data.pdf?.base64) {
+    state.pdfBase64 = data.pdf.base64;
+    pdfBtn.style.display = 'inline-flex';
+  } else {
+    pdfBtn.style.display = 'none';
+  }
   
   // Title Agent Fees
   displayFeeList('borrower-fees', data.title_agent_fees?.borrower || [], 'title');
@@ -285,6 +683,9 @@ function displayClosingCostResults(data) {
   document.getElementById('total-seller').textContent = '$' + formatCurrency(totalSeller);
   document.getElementById('grand-total').textContent = '$' + formatCurrency(totalBorrower + totalSeller);
   
+  // Raw JSON
+  document.getElementById('raw-json-output').textContent = JSON.stringify(data, null, 2);
+  
   // Scroll to results
   elements.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -303,7 +704,7 @@ function displayFeeList(containerId, fees, type) {
         <div class="fee-item">
           <div>
             <div class="fee-name">${fee.FeeName || fee.VariableName || 'Fee'}</div>
-            <div class="fee-meta">${fee.MismoMap || ''}</div>
+            <div class="fee-meta">${fee.MismoMap || ''} ${fee.FinanceCharge === 'Y' ? '(APR)' : ''}</div>
           </div>
           <div class="fee-amount">$${formatCurrency(fee.Amount)}</div>
         </div>
@@ -376,6 +777,20 @@ function calculateTotal(data, party) {
   return total;
 }
 
+function downloadPdf() {
+  if (!state.pdfBase64) {
+    showToast('No PDF available', 'error');
+    return;
+  }
+  
+  const link = document.createElement('a');
+  link.href = 'data:application/pdf;base64,' + state.pdfBase64;
+  link.download = `closing-costs-${state.lastResponse?.search_id || 'report'}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 // ==================== Property Tax ====================
 async function lookupPropertyTax(formData) {
   showLoading();
@@ -387,6 +802,7 @@ async function lookupPropertyTax(formData) {
       address: formData.address,
       close_date: formData.closeDate,
       purchase_price: formData.purchasePrice,
+      file_name: formData.fileName || 'WebApp',
       session_id: state.sessionId
     });
 
@@ -412,6 +828,7 @@ function displayPropertyTaxResults(data) {
     container.innerHTML = `
       <div class="tax-card">
         <p style="color: var(--text-secondary);">${data.message || 'No property tax data found'}</p>
+        <p class="helper-text">Response details: ${data.response_details || 'N/A'}</p>
       </div>
     `;
     return;
@@ -476,6 +893,12 @@ function displayPropertyTaxResults(data) {
             <span class="tax-value">${data.tax_calendar.prev_due.date} (${data.tax_calendar.prev_due.diff} days ago)</span>
           </div>
         ` : ''}
+        ${data.tax_calendar.full_cal && data.tax_calendar.full_cal.length > 0 ? `
+          <div class="tax-due-dates">
+            <strong>All Due Dates:</strong>
+            ${data.tax_calendar.full_cal.map(d => `<span class="due-date-badge">${d.date}</span>`).join('')}
+          </div>
+        ` : ''}
       </div>
     `;
   }
@@ -483,48 +906,8 @@ function displayPropertyTaxResults(data) {
   container.innerHTML = html || '<div class="tax-card"><p>No data available</p></div>';
 }
 
-// ==================== Endorsements ====================
-async function loadEndorsements(stateCode, county, purpose) {
-  showLoading();
-  try {
-    const params = new URLSearchParams({ state: stateCode, county, purpose, session_id: state.sessionId });
-    const response = await apiCall(`/api/endorsements?${params}`);
-    
-    if (response.error) {
-      showToast(response.error, 'error');
-    } else {
-      displayEndorsements(response);
-    }
-  } catch (error) {
-    showToast('Failed to load endorsements', 'error');
-  }
-  hideLoading();
-}
-
-function displayEndorsements(data) {
-  elements.endoResults.classList.remove('hidden');
-  const container = document.getElementById('endorsements-list');
-  
-  if (!data.endorsements || data.endorsements.length === 0) {
-    container.innerHTML = '<p class="placeholder-text">No endorsements available</p>';
-    return;
-  }
-  
-  container.innerHTML = data.endorsements.map(endo => `
-    <div class="endorsement-card ${endo.default === 1 ? 'default' : ''}">
-      <input type="checkbox" class="endorsement-checkbox" ${endo.default === 1 ? 'checked' : ''} 
-             data-endo-id="${endo.endo_id}">
-      <div class="endorsement-info">
-        <div class="endorsement-name">${endo.name}</div>
-        <div class="endorsement-id">ID: ${endo.endo_id}</div>
-      </div>
-      ${endo.default === 1 ? '<span class="endorsement-badge">Default</span>' : ''}
-    </div>
-  `).join('');
-}
-
 // ==================== Locations Browser ====================
-function displayCounties(counties) {
+function displayCountiesInBrowser(counties) {
   elements.countiesList.innerHTML = counties.map(county => `
     <div class="location-item" data-county="${county}">${county}</div>
   `).join('');
@@ -537,12 +920,12 @@ function displayCounties(counties) {
       
       const selectedState = elements.locState.value;
       const selectedCounty = item.dataset.county;
-      loadTownships(selectedState, selectedCounty, null, displayTownships);
+      loadTownships(selectedState, selectedCounty, null, displayTownshipsInBrowser);
     });
   });
 }
 
-function displayTownships(townships) {
+function displayTownshipsInBrowser(townships) {
   if (!townships || townships.length === 0) {
     elements.townshipsList.innerHTML = '<p class="placeholder-text">No townships available</p>';
     return;
@@ -551,6 +934,53 @@ function displayTownships(townships) {
   elements.townshipsList.innerHTML = townships.map(township => `
     <div class="location-item">${township}</div>
   `).join('');
+}
+
+// ==================== Build Document Type Object ====================
+function buildDocTypeObject() {
+  const docType = {};
+  
+  // Deed
+  const deedPages = parseInt(document.getElementById('doc-deed-pages')?.value) || 0;
+  if (deedPages > 0) {
+    docType.deed = {
+      page_count: deedPages,
+      num_count: 1,
+      num_grantors: parseInt(document.getElementById('doc-deed-grantors')?.value) || 1,
+      num_grantees: parseInt(document.getElementById('doc-deed-grantees')?.value) || 1
+    };
+  }
+  
+  // Mortgage
+  const mortPages = parseInt(document.getElementById('doc-mort-pages')?.value) || 0;
+  if (mortPages > 0) {
+    docType.mort = {
+      page_count: mortPages,
+      num_count: 1,
+      num_grantors: parseInt(document.getElementById('doc-mort-grantors')?.value) || 1,
+      num_grantees: parseInt(document.getElementById('doc-mort-grantees')?.value) || 1
+    };
+  }
+  
+  // Release
+  const releasePages = parseInt(document.getElementById('doc-release-pages')?.value) || 0;
+  if (releasePages > 0) {
+    docType.release = {
+      page_count: releasePages,
+      num_count: parseInt(document.getElementById('doc-release-count')?.value) || 1
+    };
+  }
+  
+  // Assignment
+  const assignPages = parseInt(document.getElementById('doc-assign-pages')?.value) || 0;
+  if (assignPages > 0) {
+    docType.assign = {
+      page_count: assignPages,
+      num_count: parseInt(document.getElementById('doc-assign-count')?.value) || 1
+    };
+  }
+  
+  return Object.keys(docType).length > 0 ? docType : null;
 }
 
 // ==================== View Navigation ====================
@@ -605,7 +1035,7 @@ function initializeEventListeners() {
   // Connect button
   elements.connectBtn.addEventListener('click', connect);
   
-  // Closing Costs Form
+  // ========== Closing Costs Form ==========
   elements.ccState.addEventListener('change', (e) => {
     if (e.target.value) {
       loadCounties(e.target.value, elements.ccCounty);
@@ -620,6 +1050,76 @@ function initializeEventListeners() {
     }
   });
   
+  // Show/hide refinance section based on purpose
+  elements.ccPurpose.addEventListener('change', (e) => {
+    const isRefinance = e.target.value === '00' || e.target.value === '04';
+    elements.refinanceSection.style.display = isRefinance ? 'block' : 'none';
+  });
+  
+  // Geocode check button
+  document.getElementById('geocode-check-btn')?.addEventListener('click', async () => {
+    const stateVal = elements.ccState.value;
+    const countyVal = elements.ccCounty.value;
+    const townshipVal = elements.ccTownship.value;
+    const addressVal = document.getElementById('cc-address').value;
+    
+    if (!stateVal || !countyVal || !townshipVal || !addressVal) {
+      showToast('Please fill in state, county, township, and address first', 'error');
+      return;
+    }
+    
+    const result = await geocodeCheck({
+      state: stateVal,
+      county: countyVal,
+      township: townshipVal,
+      address: addressVal
+    });
+  });
+  
+  // Load endorsements button
+  document.getElementById('load-endorsements-btn')?.addEventListener('click', async () => {
+    const stateVal = elements.ccState.value;
+    const countyVal = elements.ccCounty.value;
+    const purposeVal = elements.ccPurpose.value;
+    
+    if (!stateVal || !countyVal) {
+      showToast('Please select state and county first', 'error');
+      return;
+    }
+    
+    const endorsements = await loadEndorsements(stateVal, countyVal, purposeVal);
+    displayEndorsements(endorsements, 'cc-endorsements-list', true);
+  });
+  
+  // Load questions button
+  document.getElementById('load-questions-btn')?.addEventListener('click', async () => {
+    const stateVal = elements.ccState.value;
+    const purposeVal = elements.ccPurpose.value;
+    
+    if (!stateVal) {
+      showToast('Please select state first', 'error');
+      return;
+    }
+    
+    const questions = await loadQuestions(stateVal, purposeVal);
+    displayQuestions(questions, 'cc-questions-list');
+  });
+  
+  // Load sub-agents button (in closing costs form)
+  document.getElementById('load-sub-agents-btn')?.addEventListener('click', async () => {
+    const stateVal = elements.ccState.value;
+    const countyVal = elements.ccCounty.value;
+    const purposeVal = elements.ccPurpose.value;
+    
+    if (!stateVal || !countyVal) {
+      showToast('Please select state and county first', 'error');
+      return;
+    }
+    
+    await loadSubAgents(true, stateVal, countyVal, purposeVal);
+  });
+  
+  // Main form submission
   elements.ccForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!state.isConnected) {
@@ -627,32 +1127,89 @@ function initializeEventListeners() {
       return;
     }
     
-    calculateClosingCosts({
+    // Collect all form data
+    const formData = {
       state: elements.ccState.value,
       county: elements.ccCounty.value,
       township: elements.ccTownship.value,
       searchType: document.getElementById('cc-search-type').value,
-      purpose: document.getElementById('cc-purpose').value,
+      purpose: elements.ccPurpose.value,
       purchasePrice: document.getElementById('cc-purchase-price').value,
       loanAmount: document.getElementById('cc-loan-amount').value,
+      filename: document.getElementById('cc-filename').value,
       address: document.getElementById('cc-address').value,
       closeDate: document.getElementById('cc-close-date').value,
+      
+      // Refinance
+      priorInsurance: document.getElementById('cc-prior-insurance').value,
+      exdebt: document.getElementById('cc-exdebt').value,
+      priorInsuranceDate: document.getElementById('cc-prior-insurance-date').value,
+      
+      // Loan info
       propType: document.getElementById('cc-prop-type').value,
       loanType: document.getElementById('cc-loan-type').value,
       amortType: document.getElementById('cc-amort-type').value,
+      propPurpose: document.getElementById('cc-prop-purpose').value,
+      propUsage: document.getElementById('cc-prop-usage').value,
+      numFamilies: document.getElementById('cc-num-families').value,
       firstTimeBuyer: document.getElementById('cc-first-time-buyer').checked,
-      federalCreditUnion: document.getElementById('cc-federal-credit-union').checked
-    });
+      federalCreditUnion: document.getElementById('cc-federal-credit-union').checked,
+      sameLender: document.getElementById('cc-same-lender').checked,
+      sameBorrowers: document.getElementById('cc-same-borrowers').checked,
+      
+      // Policy levels
+      loanpolLevel: document.getElementById('cc-loanpol-level').value,
+      ownersLevel: document.getElementById('cc-owners-level').value,
+      
+      // Sub-agent
+      clientId: document.getElementById('cc-client-id').value,
+      agentId: document.getElementById('cc-agent-id').value,
+      
+      // Endorsements
+      endorsements: collectSelectedEndorsements('cc-endorsements-list'),
+      
+      // Questions
+      qst: collectQuestionAnswers('cc-questions-list'),
+      
+      // Document types
+      docType: buildDocTypeObject(),
+      
+      // Output options
+      includeFullPolicy: document.getElementById('cc-include-full-policy').checked,
+      includeSection: document.getElementById('cc-include-section').checked,
+      includePayee: document.getElementById('cc-include-payee').checked,
+      includePdf: document.getElementById('cc-include-pdf').checked,
+      includeSellerResponsible: document.getElementById('cc-include-seller-responsible').checked,
+      includePropertyTax: document.getElementById('cc-include-property-tax').checked,
+      includeAppraisal: document.getElementById('cc-include-appraisal').checked
+    };
+    
+    calculateClosingCosts(formData);
   });
   
+  // Clear form
   document.getElementById('clear-form-btn').addEventListener('click', () => {
     elements.ccForm.reset();
     elements.resultsSection.classList.add('hidden');
     elements.ccCounty.disabled = true;
     elements.ccTownship.disabled = true;
+    elements.refinanceSection.style.display = 'none';
+    document.getElementById('cc-endorsements-list').innerHTML = '';
+    document.getElementById('cc-questions-list').innerHTML = '';
   });
   
-  // Property Tax Form
+  // Download PDF
+  document.getElementById('download-pdf-btn')?.addEventListener('click', downloadPdf);
+  
+  // Toggle raw JSON
+  document.getElementById('toggle-raw-json')?.addEventListener('click', () => {
+    const output = document.getElementById('raw-json-output');
+    const btn = document.getElementById('toggle-raw-json');
+    output.classList.toggle('hidden');
+    btn.textContent = output.classList.contains('hidden') ? 'Show Raw JSON' : 'Hide Raw JSON';
+  });
+  
+  // ========== Property Tax Form ==========
   elements.ptForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!state.isConnected) {
@@ -666,30 +1223,85 @@ function initializeEventListeners() {
       city: document.getElementById('pt-city').value,
       address: document.getElementById('pt-address').value,
       closeDate: document.getElementById('pt-close-date').value,
-      purchasePrice: document.getElementById('pt-purchase-price').value
+      purchasePrice: document.getElementById('pt-purchase-price').value,
+      fileName: document.getElementById('pt-file-name').value
     });
   });
   
-  // Endorsements Form
-  elements.endoForm.addEventListener('submit', (e) => {
+  // ========== Endorsements Form ==========
+  elements.endoForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!state.isConnected) {
       showToast('Please connect first', 'error');
       return;
     }
     
-    loadEndorsements(
+    const endorsements = await loadEndorsements(
       elements.endoState.value,
       document.getElementById('endo-county').value,
       document.getElementById('endo-purpose').value
     );
+    displayEndorsements(endorsements, 'endorsements-list');
+    elements.endoResults.classList.remove('hidden');
   });
   
-  // Locations browser
+  // ========== Questions Form ==========
+  elements.qstForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!state.isConnected) {
+      showToast('Please connect first', 'error');
+      return;
+    }
+    
+    const questions = await loadQuestions(
+      elements.qstState.value,
+      document.getElementById('qst-purpose').value
+    );
+    displayQuestions(questions, 'questions-list');
+    elements.qstResults.classList.remove('hidden');
+  });
+  
+  // ========== Geocode Form ==========
+  elements.geoForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!state.isConnected) {
+      showToast('Please connect first', 'error');
+      return;
+    }
+    
+    geocodeCheck({
+      state: elements.geoState.value,
+      county: document.getElementById('geo-county').value,
+      township: document.getElementById('geo-township').value,
+      address: document.getElementById('geo-address').value
+    });
+  });
+  
+  // ========== Sub-Agents View ==========
+  document.getElementById('load-sub-agents')?.addEventListener('click', () => {
+    if (!state.isConnected) {
+      showToast('Please connect first', 'error');
+      return;
+    }
+    
+    const includeContact = document.getElementById('sa-include-contact').checked;
+    const stateVal = document.getElementById('sa-state')?.value;
+    const countyVal = document.getElementById('sa-county')?.value;
+    const purposeVal = document.getElementById('sa-purpose')?.value;
+    
+    if (!stateVal || !countyVal || !purposeVal) {
+      showToast('Please fill in state, county, and purpose', 'error');
+      return;
+    }
+    
+    loadSubAgents(includeContact, stateVal, countyVal, purposeVal);
+  });
+  
+  // ========== Locations Browser ==========
   elements.locState.addEventListener('change', (e) => {
     if (e.target.value && state.isConnected) {
       const selectedState = e.target.value;
-      loadCounties(selectedState, null, displayCounties);
+      loadCounties(selectedState, null, displayCountiesInBrowser);
       elements.townshipsList.innerHTML = '<p class="placeholder-text">Select a county to view townships</p>';
     }
   });
@@ -708,5 +1320,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeCollapsibles();
   initializeEventListeners();
   
-  console.log('LodeStar Web App initialized');
+  console.log('LodeStar Web App initialized - Full Feature Version');
 });

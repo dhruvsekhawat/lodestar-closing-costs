@@ -5,7 +5,7 @@ module.exports = async function handler(req, res) {
   }
 
   const { state, session_id } = req.query;
-  const CLIENT_NAME = process.env.LODESTAR_CLIENT_NAME || 'SettleWise';
+  const CLIENT_NAME = process.env.LODESTAR_CLIENT_NAME || 'LodeStar_Discovery_API';
 
   if (!state || !session_id) {
     return res.status(400).json({ error: 'Missing state or session_id' });
@@ -13,7 +13,10 @@ module.exports = async function handler(req, res) {
 
   try {
     const response = await fetch(
-      `https://www.lodestarss.com/Live/${CLIENT_NAME}/counties.php?state=${state}&session_id=${session_id}`
+      `https://www.lodestarss.com/Live/${CLIENT_NAME}/counties.php?state=${state}&session_id=${session_id}`,
+      {
+        headers: { 'Accept': 'application/json' }
+      }
     );
 
     const text = await response.text();
